@@ -1,0 +1,41 @@
+osx build notes
+
+PDF -> HPGL
+
+brew install pstoedit 
+brew install graphicsmagick
+brew install potrace
+
+hp2xx installed:
+
+X11Quartz
+Change CPPFLAGS and LFLAGS to point to -I/usr/xll/include and -L/usr/xll/lib
+
+
+TROUBLESHOOTING
+
+A) make sure paper is loaded
+B) turn off everything and hard reset printer
+reset to
+Duplex: Half
+Baud rate: 9600
+Handshake: Hardwire
+
+in Chiplotle:
+baudrate = 9600
+bytesize = 8
+parity = 'N'
+stopbits = 1
+timeout = 1
+xonxoff = 0
+rtscts = 1
+
+
+myfile = io.import_hpgl_file()
+hpgltools.get_bounding_box(myfile)
+
+To convert PS to HPGL for penplotters
+pstoedit <src> <target> -f hpgl:-penplotter
+
+To convert image to PS
+potrace -b pdf -r 20 -t 2 -a 1 ***.bmp
