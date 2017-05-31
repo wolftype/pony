@@ -27,7 +27,7 @@ class Printer:
     def __init__(self):
         self.bVirtual = True
 
-    def instantiate ():
+    def instantiate (self):
         if self.bVirtual:
 	    self.plotter = plottertools.instantiate_virtual_plotter()
         else:
@@ -50,17 +50,18 @@ class State:
         self.line_type = 1
 
 class File:
-    def __init__(self, name):
-        self.input = name or ""
-        tname, ext = os.path.splitext(name)
-        self.output = tname+"_output.hpgl"
-        self.width_coord = 0.0
-        self.height_coord = 0.0
+    def __init__(self):
+        self.input = ""
+        self.output = "output.hpgl"
+        self.width_coord = 1.0
+        self.height_coord = 1.0
         self.aspect = 1.0
-        self.load (name)
+        self.input_commands = []
 
-    def load (name):
+    def load (self, name):
         if name != "":
+            tname, ext = os.path.splitext(name)
+            self.output = tname+"_output.hpgl"
             self.input = name
             self.input_commands = io.import_hpgl_file(self.input)
             xmin = 1000000.0
@@ -86,7 +87,7 @@ class File:
             self.aspect = self.width_coord/self.height_coord
 
 class Calibration:
-    def _init__(self):
+    def __init__(self):
         self.reg_x = 0.0
         self.reg_y = 0.0
         self.img_x_scale = 1.0
@@ -104,11 +105,11 @@ class Calibration:
         self.paper_width_inches_B = 17
         self.preserve_source_aspect = True
 
-    def long ():
+    def long (self):
         self.paper_x_coord = self.paper_x_coord_B
         self.paper_width_inches = self.paper_width_inches_B
 
-    def scale (x,y, bAbsolute):
+    def scale (self,x,y, bAbsolute):
         if bAbsolute:
             self.img_x_scale = x/self.paper_width_inches
             self.img_y_scale = y/self.paper_height_inches
@@ -116,7 +117,7 @@ class Calibration:
             self.img_x_scale = x
             self.img_y_scale = y
 
-     def register (x,y,bAbsolute):
+    def register (self,x,y,bAbsolute):
         if bAbsolute:
             self.reg_x_percentage = float(args[iter+1])/self.paper_width_inches
     	    self.reg_y_percentage = float(args[iter+2])/self.paper_height_inches
@@ -124,22 +125,22 @@ class Calibration:
             self.reg_x_percentage = x
             self.reg_y_percentage = y
 
-    def calc ():
+    def calc (self):
         #OUTPUT IMAGE WIDTH AND HEIGHT
         self.img_x_coord = self.paper_x_coord * self.img_x_scale
         self.img_y_coord = self.paper_y_coord * self.img_y_scale
 
         #BOTTOM LEFT CORNER
-        if reg_is_centered == True:
-            reg_x = (paper_x_coord - img_x_coord) / 2.0
-            reg_y = (paper_y_coord - img_y_coord) / 2.0
+        if self.reg_is_centered == True:
+            self.reg_x = (self.paper_x_coord - self.img_x_coord) / 2.0
+            self.reg_y = (self.paper_y_coord - self.img_y_coord) / 2.0
         else:
-            reg_x = paper_x_coord * reg_x_percentage
-            reg_y = paper_y_coord * reg_y_percentage
+            self.reg_x = self.paper_x_coord * self.reg_x_percentage
+            self.reg_y = self.paper_y_coord * self.reg_y_percentage
 
 
 class Print:
-    def _init_(self, args):
+    def __init__(self, args):
         self.file = File()
         self.printer = Printer()
         self.calibration = Calibration ()
@@ -171,41 +172,40 @@ class Print:
                 """)
                 sys.exit("----")
 
-            for iter, i in enumerate(args):
-                if i == "-i": #filename input
-                    self.file.input = args[iter+1]
-                if i == "-o": #filename to save as
-                    self.file.output = args[iter+1]
-                if i == "-p": #actually send to printer
-                    self.printer.bVirtual = False
-                if i == "-sr": #scale relatively (0,1.0)
-                    self.calibration.scale (float(args[iter+1]), float(args[iter+2], False)
-                if i == "-sa": #scale absolutely (in inches)
-                    self.calibration.scale (float(args[iter+1]), float(args[iter+2], True)
-                if i == "-rr": #register relatively from 0,1
-                    self.calibration.register (float(args[iter+1]), float(args[iter+2], False)
-                if i == "-ra": #register absolutely (in inches)
-                    self.calibration.register (float(args[iter+1]), float(args[iter+2], True)
-                if i == "-c": #make all coordinates circles of radius
-                    self.style.should_draw_circles = True
-                    self.style.circle_coords_radius = float(args[iter+1])
-                if i == "-x": #make all coordinates Xs
-                    self.style.should_draw_crosses = True
-                    self.style.cross_coords_length = float(args[iter+1])
-                if i == "-no": #don't draw lines
-                    self.style.should_draw_original = False
-                if i == "-sp": #select pen
-                    self.state.pen_number = int(sys.argv[iter+1])
-                if i == "-t": #text
-                    self.style.should_plot_text = True
-                    self.state.text = args[iter+1]
-
+        for iter, i in enumerate(args):
+            if i == "-i": #filename input
+                self.file.load (args[iter+1])
+            if i == "-o": #filename to save as
+                self.file.output = args[iter+1]
+            if i == "-p": #actually send to printer
+                self.printer.bVirtual = False
+            if i == "-sr": #scale relatively (0,1.0)
+                self.calibration.scale (float(args[iter+1]), float(args[iter+2]), False)
+            if i == "-sa": #scale absolutely (in inches)
+                self.calibration.scale (float(args[iter+1]), float(args[iter+2]), True)
+            if i == "-rr": #register relatively from 0,1
+                self.calibration.register (float(args[iter+1]), float(args[iter+2]), False)
+            if i == "-ra": #register absolutely (in inches)
+                self.calibration.register (float(args[iter+1]), float(args[iter+2]), True)
+            if i == "-c": #make all coordinates circles of radius
+                self.style.should_draw_circles = True
+                self.style.circle_coords_radius = float(args[iter+1])
+            if i == "-x": #make all coordinates Xs
+                self.style.should_draw_crosses = True
+                self.style.cross_coords_length = float(args[iter+1])
+            if i == "-no": #don't draw lines
+                self.style.should_draw_original = False
+            if i == "-sp": #select pen
+                self.state.pen_number = int(sys.argv[iter+1])
+            if i == "-t": #text
+                self.style.should_draw_text = True
+                self.state.text = args[iter+1]
 
             self.calibration.calc()
             self.resize()
             self.prepare()
 
-    def resize():
+    def resize(self):
         rw = 1.0
         rh = 1.0
         rw = self.calibration.img_x_coord / self.file.width_coord
@@ -215,37 +215,42 @@ class Print:
             rh = self.calibration.img_y_coord / self.file.height_coord
 
         for p in self.file.input_commands:
-    	if ((p._name == 'PU' or p._name == 'PD') and len(p.xy) > 0 ):
-            tmpx = self.calibration.reg_x + p.x[0] * rw
-            tmpy = self.calibration.reg_y + p.y[0] * rh 
-            p.xy = CoordinateArray( [ (tmpx, tmpy) ] )
-            self.pos_commands.append(p)
+    	    if ((p._name == 'PU' or p._name == 'PD') and len(p.xy) > 0 ):
+                tmpx = self.calibration.reg_x + p.x[0] * rw
+                tmpy = self.calibration.reg_y + p.y[0] * rh
+                p.xy = CoordinateArray( [ (tmpx, tmpy) ] )
+                self.pos_commands.append(p)
 
-    def prepare():
+    def prepare(self):
 
         if (self.style.should_draw_original):
-            self.commands.append(SP(self.style.pen_number))
+            self.commands.append(SP(self.state.pen_number))
             for p in self.pos_commands:
                 self.commands.append(p)
 
         if (self.style.should_draw_circles):
-            self.commands.append(SP(self.style.pen_number))
+            self.commands.append(SP(self.state.pen_number))
             for c in self.pos_commands:
-	    if (c._name == 'PD'):
-		c = CI(30)
-	        self.commands.append(c)
+	        if (c._name == 'PD'):
+		    c = CI(30)
+	            self.commands.append(c)
 
-        if (should_plot_text):
+        if (self.style.should_draw_text):
             self.commands.append(SP(self.style.pen_number))
             self.commands.append(PA([(self.calibration.reg_x , self.calibration.reg_y)]))
             self.commands.append(hpgl.SI(self.calibration.img_x_scale, self.calibration.img_y_scale))
             self.commands.append(hpgl.LB(self.state.text))
 
-    def send():
+    def send(self):
         io.save_hpgl (self.commands, self.file.output)
 
-        if self.plotter.bVirtual:
+        if self.printer.bVirtual:
 	    subprocess.check_output(['view_hpgl_file.py', self.file.output])
         else:
             plotter.write(commands)
+
+if len(sys.argv) > 1:
+    p = Print (sys.argv)
+    p.printer.instantiate()
+    p.send()
 
