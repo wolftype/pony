@@ -92,17 +92,17 @@ class Calibration:
         self.reg_y = 0.0
         self.img_x_scale = 1.0
         self.img_y_scale = 1.0
-        self.img_x_coord = 7840
-        self.img_y_coord = 10170
+        self.img_x_coord = 7840.0
+        self.img_y_coord = 10170.0
         self.reg_x_percentage = 0.0
         self.reg_y_percentage = 0.0
         self.reg_is_centered = True
-        self.paper_y_coord = 10170 		#11"
-        self.paper_x_coord = 7840 		#8.5"
-        self.paper_x_coord_B = 16450		#17"
-        self.paper_height_inches = 11
+        self.paper_y_coord = 10170.0 		#11"
+        self.paper_x_coord = 7840.0 		#8.5"
+        self.paper_x_coord_B = 16450.0		#17"
+        self.paper_height_inches = 11.0
         self.paper_width_inches = 8.5
-        self.paper_width_inches_B = 17
+        self.paper_width_inches_B = 17.0
         self.preserve_source_aspect = True
 
     def long (self):
@@ -118,6 +118,7 @@ class Calibration:
             self.img_y_scale = y
 
     def register (self,x,y,bAbsolute):
+        slef.reg_is_centered = False
         if bAbsolute:
             self.reg_x_percentage = float(args[iter+1])/self.paper_width_inches
     	    self.reg_y_percentage = float(args[iter+2])/self.paper_height_inches
@@ -140,7 +141,7 @@ class Calibration:
 
 
 class Print:
-    def __init__(self, args):
+    def __init__(self):
         self.file = File()
         self.printer = Printer()
         self.calibration = Calibration ()
@@ -150,6 +151,7 @@ class Print:
         self.cir_commands = []
         self.commands = [IN(),FS(8)]
 
+    def parse (self, args):
         for iter, i in enumerate(args):
             print iter, i
             if i == "-l": #long format (11x17)
@@ -201,11 +203,11 @@ class Print:
                 self.style.should_draw_text = True
                 self.state.text = args[iter+1]
 
-            self.calibration.calc()
             self.resize()
             self.prepare()
 
     def resize(self):
+        self.calibration.calc()
         rw = 1.0
         rh = 1.0
         rw = self.calibration.img_x_coord / self.file.width_coord
@@ -250,7 +252,8 @@ class Print:
             plotter.write(commands)
 
 if len(sys.argv) > 1:
-    p = Print (sys.argv)
+    p = Print ()
+    p.parse(sys.argv)
     p.printer.instantiate()
     p.send()
 
