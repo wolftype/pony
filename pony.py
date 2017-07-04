@@ -151,29 +151,35 @@ class Print:
         self.cir_commands = []
         self.commands = [IN(),FS(8)]
 
+    def help (self):
+        print ("""
+            -p                      actually send to printer
+            -l                      calibrate with long paper (11 x 17)
+            -no                     do not draw original line drawing
+            -i  <filename>          input filename
+            -o  <filename>          output filename
+            -sr <width> <height>    scale relative (0.0, 1.0)
+            -sa <width> <height>    scale absolute (in inches)
+            -rr <width> <height>    register relative (0.0, 1.0)
+            -ra <width> <height>    register absolute (in inches)
+            -c  <radius>            draw circles around coordinates
+            -x  <length>            draw crosses around coordinates (not implemented)
+            -t  <text>              draw text
+            -sp <number>            select pen -- at sunset blvd studio, this is one of the following:
+                1: hb pencil   |  2: 2b pencil | 3: red pencil | 4: 4b pencil
+                5: blue pencil |  6: black pen | 7: red pen    | 8: blue pen
+        """)
+        sys.exit("----")
+
     def parse (self, args):
+        if len(args) == 1:
+            self.help()
         for iter, i in enumerate(args):
             print iter, i
             if i == "-l": #long format (11x17)
                 self.calibration.long ()
             if i == "-help": #print out below
-                print ("""
-                    -i  input_filename
-                    -o  output_filename
-                    -p  actually send to printer
-                    -sr scaling relative
-                    -sa scale absolute
-                    -rr register relative
-                    -ra register absolute
-                    -c  draw circles around coordinates
-                    -x  draw crosses around coordinates (not implemented)
-                    -no do not draw original line drawing
-                    -sp select pen
-                        1: hb pencil   |  2: 2b pencil | 3: red pencil | 4: 4b pencil
-                        5: blue pencil |  6: black pen | 7: red pen    | 8: blue pen
-                """)
-                sys.exit("----")
-
+                self.help()
         for iter, i in enumerate(args):
             if i == "-i": #filename input
                 self.file.load (args[iter+1])
@@ -251,6 +257,7 @@ class Print:
         else:
             plotter.write(commands)
 
+#use this script directly
 if len(sys.argv) > 1:
     p = Print ()
     p.parse(sys.argv)
