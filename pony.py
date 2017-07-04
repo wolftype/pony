@@ -33,6 +33,9 @@ class Printer:
         else:
 	    self.plotter = instantiate_plotters()[0]
 
+    def write (self, commands):
+        self.plotter.write (commands)
+
 class Style:
     def __init__(self):
         self.should_draw_original = True
@@ -40,6 +43,7 @@ class Style:
         self.should_draw_crosses = False
         self.should_draw_text = False
         self.should_randomize_colors = False
+        self.should_draw_bounding_box = False
 
 class State:
     def __init__(self):
@@ -79,12 +83,12 @@ class File:
                         xmin = p.x[0]
                     if p.y[0] > ymax:
                         ymax = p.y[0]
-                    if p.y[0] < ymin:
-                        ymin = p.y[0]
+                if p.y[0] < ymin:
+                    ymin = p.y[0]
 
-            self.width_coord = float(xmax-xmin);
-            self.height_coord = float(ymax-ymin);
-            self.aspect = self.width_coord/self.height_coord
+        self.width_coord = float(xmax-xmin);
+        self.height_coord = float(ymax-ymin);
+        self.aspect = self.width_coord/self.height_coord
 
 class Calibration:
     def __init__(self):
@@ -92,22 +96,22 @@ class Calibration:
         self.reg_y = 0.0
         self.img_x_scale = 1.0
         self.img_y_scale = 1.0
-        self.img_x_coord = 7840.0
-        self.img_y_coord = 10170.0
+        self.img_y_coord = 7840.0
+        self.img_x_coord = 10170.0
         self.reg_x_percentage = 0.0
         self.reg_y_percentage = 0.0
         self.reg_is_centered = True
-        self.paper_y_coord = 10170.0 		#11"
-        self.paper_x_coord = 7840.0 		#8.5"
-        self.paper_x_coord_B = 16450.0		#17"
-        self.paper_height_inches = 11.0
-        self.paper_width_inches = 8.5
-        self.paper_width_inches_B = 17.0
+        self.paper_x_coord = 10170.0 		#11"
+        self.paper_y_coord = 7840.0 		#8.5"
+        self.paper_y_coord_B = 16450.0		#17"
+        self.paper_width_inches = 11.0
+        self.paper_height_inches = 8.5
+        self.paper_height_inches_B = 17.0
         self.preserve_source_aspect = True
 
     def long (self):
-        self.paper_x_coord = self.paper_x_coord_B
-        self.paper_width_inches = self.paper_width_inches_B
+        self.paper_y_coord = self.paper_y_coord_B
+        self.paper_height_inches = self.paper_height_inches_B
 
     def scale (self,x,y, bAbsolute):
         if bAbsolute:
@@ -121,7 +125,7 @@ class Calibration:
         slef.reg_is_centered = False
         if bAbsolute:
             self.reg_x_percentage = float(args[iter+1])/self.paper_width_inches
-    	    self.reg_y_percentage = float(args[iter+2])/self.paper_height_inches
+            self.reg_y_percentage = float(args[iter+2])/self.paper_height_inches
         else:
             self.reg_x_percentage = x
             self.reg_y_percentage = y
@@ -149,13 +153,16 @@ class Print:
         self.state = State ()
         self.pos_commands = []
         self.cir_commands = []
-        self.commands = [IN(),FS(8)]
+        self.commands = [IN(),FS(8),PU([(0,0)])]
 
     def help (self):
         print ("""
             -p                      actually send to printer
             -l                      calibrate with long paper (11 x 17)
             -no                     do not draw original line drawing
+            -b                      draw bounding box
+            -lt <0-6> <length>      line type and length
+            -fs <0-8>               force
             -i  <filename>          input filename
             -o  <filename>          output filename
             -sr <width> <height>    scale relative (0.0, 1.0)
@@ -178,7 +185,7 @@ class Print:
             print iter, i
             if i == "-l": #long format (11x17)
                 self.calibration.long ()
-            if i == "-help": #print out below
+            if i == "-help": #print out help
                 self.help()
         for iter, i in enumerate(args):
             if i == "-i": #filename input
@@ -204,13 +211,20 @@ class Print:
             if i == "-no": #don't draw lines
                 self.style.should_draw_original = False
             if i == "-sp": #select pen
-                self.state.pen_number = int(sys.argv[iter+1])
+                self.state.pen_number = int(args[iter+1])
             if i == "-t": #text
                 self.style.should_draw_text = True
                 self.state.text = args[iter+1]
+            if i == "-b": #bounding box
+                self.style.should_draw_bounding_box = True
+            if i == "-lt": #line type and length
+               self.commands.append(LT( int(args[iter+1]), float(args[iter+2])))
+            if i == "-fs": #line force
+               self.commands.append(FS( int(args[iter+1])))
 
-            self.resize()
-            self.prepare()
+        self.commands.append(PU([(0,0)]));
+        self.resize()
+        self.prepare()
 
     def resize(self):
         self.calibration.calc()
@@ -223,11 +237,11 @@ class Print:
             rh = self.calibration.img_y_coord / self.file.height_coord
 
         for p in self.file.input_commands:
-    	    if ((p._name == 'PU' or p._name == 'PD') and len(p.xy) > 0 ):
-                tmpx = self.calibration.reg_x + p.x[0] * rw
-                tmpy = self.calibration.reg_y + p.y[0] * rh
-                p.xy = CoordinateArray( [ (tmpx, tmpy) ] )
-                self.pos_commands.append(p)
+            if ((p._name == 'PU' or p._name == 'PD') and len(p.xy) > 0 ):
+                    tmpx = self.calibration.reg_x + p.x[0] * rw
+                    tmpy = self.calibration.reg_y + p.y[0] * rh
+                    p.xy = CoordinateArray( [ (tmpx, tmpy) ] )
+                    self.pos_commands.append(p)
 
     def prepare(self):
 
@@ -249,16 +263,36 @@ class Print:
             self.commands.append(hpgl.SI(self.calibration.img_x_scale, self.calibration.img_y_scale))
             self.commands.append(hpgl.LB(self.state.text))
 
+        if (self.style.should_draw_bounding_box):
+            x0 = int(self.calibration.reg_x)
+            y0 = int(self.calibration.reg_y)
+            x1 = x0 + int(self.calibration.img_x_coord)
+            y1 = y0 + int(self.calibration.img_y_coord)
+            start = CoordinateArray([(x0,y0)])
+            right = CoordinateArray([(x1,y0)])
+            up = CoordinateArray([(x0, y1)])
+            diag = CoordinateArray([(x1,y1)])
+            self.commands.append(PA([(x0,y0)]))
+            self.commands.append(PD([(x0,y1)]))
+            self.commands.append(PD([(x1,y1)]))
+            self.commands.append(PD([(x1,y0)]))
+            self.commands.append(PD([(x0,y0)]))
+            self.commands.append(PU([(x0-100, y0-100)]))
+            self.commands.append(PD([(x0-100, y0-100)]))
+            self.commands.append(PU([(x1+100, y1+100)]))
+            self.commands.append(PD([(x1+100, y1+100)]))
+
+
     def send(self):
         io.save_hpgl (self.commands, self.file.output)
 
-        if self.printer.bVirtual:
-	    subprocess.check_output(['view_hpgl_file.py', self.file.output])
+        if self.printer.bVirtual: subprocess.check_output(['view_hpgl_file.py', self.file.output])
         else:
-            plotter.write(commands)
+            self.printer.write(self.commands)
 
 #use this script directly
 if len(sys.argv) > 1:
+    print ("PONY PROCESS")
     p = Print ()
     p.parse(sys.argv)
     p.printer.instantiate()
