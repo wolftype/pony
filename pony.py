@@ -52,6 +52,8 @@ class State:
         self.pen_number = 1
         self.text = ""
         self.line_type = 1
+        self.text_scale_x = 1
+        self.text_scale_y = 1
 
 class File:
     def __init__(self):
@@ -96,22 +98,26 @@ class Calibration:
         self.reg_y = 0.0
         self.img_x_scale = 1.0
         self.img_y_scale = 1.0
-        self.img_y_coord = 7840.0
         self.img_x_coord = 10170.0
+        self.img_y_coord = 7840.0
         self.reg_x_percentage = 0.0
         self.reg_y_percentage = 0.0
         self.reg_is_centered = True
         self.paper_x_coord = 10170.0 		#11"
         self.paper_y_coord = 7840.0 		#8.5"
-        self.paper_y_coord_B = 16450.0		#17"
+        self.paper_x_coord_B = 16450.0		#17"
+        self.paper_y_coord_B = 10170.0 		#8.5"
         self.paper_width_inches = 11.0
         self.paper_height_inches = 8.5
-        self.paper_height_inches_B = 17.0
+        self.paper_width_inches_B = 17.0
+        self.paper_height_inches_B = 11.0
         self.preserve_source_aspect = True
 
     def long (self):
         self.paper_y_coord = self.paper_y_coord_B
-        self.paper_height_inches = self.paper_height_inches_B
+        self.paper_height_inches  = self.paper_height_inches_B
+        self.paper_x_coord = self.paper_x_coord_B
+        self.paper_width_inches = self.paper_width_inches_B
 
     def scale (self,x,y, bAbsolute):
         if bAbsolute:
@@ -167,11 +173,12 @@ class Print:
             -o  <filename>          output filename
             -sr <width> <height>    scale relative (0.0, 1.0)
             -sa <width> <height>    scale absolute (in inches)
-            -rr <width> <height>    register relative (0.0, 1.0)
+            -rr <width> <height>    register relative [0.0, 1.0]
             -ra <width> <height>    register absolute (in inches)
             -c  <radius>            draw circles around coordinates
             -x  <length>            draw crosses around coordinates (not implemented)
             -t  <text>              draw text
+            -st <scalex> <scaley>   scale text [0.0,1.0]
             -sp <number>            select pen -- at sunset blvd studio, this is one of the following:
                 1: hb pencil   |  2: 2b pencil | 3: red pencil | 4: 4b pencil
                 5: blue pencil |  6: black pen | 7: red pen    | 8: blue pen
@@ -179,14 +186,13 @@ class Print:
         sys.exit("----")
 
     def parse (self, args):
-        if len(args) == 1:
-            self.help()
         for iter, i in enumerate(args):
-            print iter, i
             if i == "-l": #long format (11x17)
                 self.calibration.long ()
             if i == "-help": #print out help
                 self.help()
+            if i == "-r": #reset state and style
+                self.style = Style()
         for iter, i in enumerate(args):
             if i == "-i": #filename input
                 self.file.load (args[iter+1])
@@ -215,12 +221,15 @@ class Print:
             if i == "-t": #text
                 self.style.should_draw_text = True
                 self.state.text = args[iter+1]
+            if i == "-st": #scale text
+                self.state.text_scale_x = float(args[iter+1])
+                self.state.text_scale_y = float(args[iter+2])
             if i == "-b": #bounding box
                 self.style.should_draw_bounding_box = True
             if i == "-lt": #line type and length
-               self.commands.append(LT( int(args[iter+1]), float(args[iter+2])))
+                self.commands.append(LT(int(args[iter+1]), float(args[iter+2])))
             if i == "-fs": #line force
-               self.commands.append(FS( int(args[iter+1])))
+                self.commands.append(FS( int(args[iter+1])))
 
         self.commands.append(PU([(0,0)]));
         self.resize()
@@ -258,9 +267,9 @@ class Print:
 	            self.commands.append(c)
 
         if (self.style.should_draw_text):
-            self.commands.append(SP(self.style.pen_number))
+            self.commands.append(SP(self.state.pen_number))
             self.commands.append(PA([(self.calibration.reg_x , self.calibration.reg_y)]))
-            self.commands.append(hpgl.SI(self.calibration.img_x_scale, self.calibration.img_y_scale))
+            self.commands.append(hpgl.SI(self.state.text_scale_x, self.state.text_scale_y))
             self.commands.append(hpgl.LB(self.state.text))
 
         if (self.style.should_draw_bounding_box):
@@ -290,8 +299,8 @@ class Print:
         else:
             self.printer.write(self.commands)
 
-#use this script directly
-if len(sys.argv) > 1:
+#use this script directly if called from command line
+if len(sys.argv) > 0:
     print ("PONY PROCESS")
     p = Print ()
     p.parse(sys.argv)
