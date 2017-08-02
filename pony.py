@@ -58,38 +58,38 @@ class State:
 class File:
     def __init__(self):
         self.input = ""
-        self.output = "output.hpgl"
+        self.output = "tmp_output.hpgl"
         self.width_coord = 1.0
         self.height_coord = 1.0
         self.aspect = 1.0
         self.input_commands = []
+        self.xmin = 1000000.0
+        self.xmax = 0.0
+        self.ymin = 1000000.0
+        self.ymax = 0.0
 
     def load (self, name):
         if name != "":
             tname, ext = os.path.splitext(name)
-            self.output = tname+"_output.hpgl"
+            self.output = tname+"_processed.hpgl"
             self.input = name
             self.input_commands = io.import_hpgl_file(self.input)
-            xmin = 1000000.0
-            xmax = 0.0
-            ymin = 1000000.0
-            ymax = 0.0
 
             #for each COMMAND in the input file
             for p in self.input_commands:
                 #if the command name is Up or Down and its not empty, get max size
                 if ((p._name == 'PU' or p._name == 'PD') and len(p.xy) > 0 ):
-                    if p.x[0] > xmax:
-                        xmax = p.x[0]
-                    if p.x[0] < xmin:
-                        xmin = p.x[0]
-                    if p.y[0] > ymax:
-                        ymax = p.y[0]
-                if p.y[0] < ymin:
-                    ymin = p.y[0]
+                    if p.x[0] > self.xmax:
+                        self.xmax = p.x[0]
+                    if p.x[0] < self.xmin:
+                        self.xmin = p.x[0]
+                    if p.y[0] > self.ymax:
+                        self.ymax = p.y[0]
+                    if p.y[0] < self.ymin:
+                        self.ymin = p.y[0]
 
-        self.width_coord = float(xmax-xmin);
-        self.height_coord = float(ymax-ymin);
+        self.width_coord = float(self.xmax-self.xmin);
+        self.height_coord = float(self.ymax-self.ymin);
         self.aspect = self.width_coord/self.height_coord
 
 class Calibration:
@@ -112,6 +112,7 @@ class Calibration:
         self.paper_width_inches_B = 17.0
         self.paper_height_inches_B = 11.0
         self.preserve_source_aspect = True
+        self.source_aspect = 1.0 
 
     def long (self):
         self.paper_y_coord = self.paper_y_coord_B
@@ -128,7 +129,7 @@ class Calibration:
             self.img_y_scale = y
 
     def register (self,x,y,bAbsolute):
-        slef.reg_is_centered = False
+        self.reg_is_centered = False
         if bAbsolute:
             self.reg_x_percentage = float(args[iter+1])/self.paper_width_inches
             self.reg_y_percentage = float(args[iter+2])/self.paper_height_inches
@@ -139,7 +140,13 @@ class Calibration:
     def calc (self):
         #OUTPUT IMAGE WIDTH AND HEIGHT
         self.img_x_coord = self.paper_x_coord * self.img_x_scale
-        self.img_y_coord = self.paper_y_coord * self.img_y_scale
+        if (self.preserve_source_aspect):
+            self.img_y_coord = self.img_x_coord * self.source_aspect
+        else:
+            self.img_y_coord = self.paper_y_coord * self.img_y_scale
+        print (self.img_x_scale, self.img_y_scale)
+        print (self.paper_x_coord, self.paper_y_coord)
+        print (self.img_x_coord, self.img_y_coord)
 
         #BOTTOM LEFT CORNER
         if self.reg_is_centered == True:
@@ -236,6 +243,7 @@ class Print:
         self.prepare()
 
     def resize(self):
+        self.calibration.source_aspect = self.file.width_coord / self.file.height_coord
         self.calibration.calc()
         rw = 1.0
         rh = 1.0
@@ -246,18 +254,16 @@ class Print:
             rh = self.calibration.img_y_coord / self.file.height_coord
 
         for p in self.file.input_commands:
-            if ((p._name == 'PU' or p._name == 'PD') and len(p.xy) > 0 ):
-                    tmpx = self.calibration.reg_x + p.x[0] * rw
-                    tmpy = self.calibration.reg_y + p.y[0] * rh
+            if (p._name == 'PU' or p._name == 'PD'):
+                if (len(p.xy) > 0):
+                    tmpx = self.calibration.reg_x + (p.x[0]-self.file.xmin) * rw
+                    tmpy = self.calibration.reg_y + (p.y[0]-self.file.ymin) * rh
                     p.xy = CoordinateArray( [ (tmpx, tmpy) ] )
                     self.pos_commands.append(p)
+            elif (p._name != 'IN' and p._name != 'EC' and p._name != 'SP' and p._name != 'PG'):
+                self.pos_commands.append(p)
 
     def prepare(self):
-
-        if (self.style.should_draw_original):
-            self.commands.append(SP(self.state.pen_number))
-            for p in self.pos_commands:
-                self.commands.append(p)
 
         if (self.style.should_draw_circles):
             self.commands.append(SP(self.state.pen_number))
@@ -273,6 +279,7 @@ class Print:
             self.commands.append(hpgl.LB(self.state.text))
 
         if (self.style.should_draw_bounding_box):
+            self.commands.append(SP(self.state.pen_number))
             x0 = int(self.calibration.reg_x)
             y0 = int(self.calibration.reg_y)
             x1 = x0 + int(self.calibration.img_x_coord)
@@ -290,6 +297,11 @@ class Print:
             self.commands.append(PD([(x0-100, y0-100)]))
             self.commands.append(PU([(x1+100, y1+100)]))
             self.commands.append(PD([(x1+100, y1+100)]))
+
+        if (self.style.should_draw_original):
+            self.commands.append(SP(self.state.pen_number))
+            for p in self.pos_commands:
+                self.commands.append(p)
 
 
     def send(self):
